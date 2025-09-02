@@ -11,7 +11,8 @@ import {
   DeclareContractPayload,
   UniversalDetails,
   isSierra,
-  TransactionReceipt,
+  GetTransactionReceiptResponse,
+  RevertedTransactionReceiptResponse,
   constants,
 } from "starknet";
 import { DeployContractParams, Network } from "./types";
@@ -247,14 +248,16 @@ const executeDeployCalls = async (options?: UniversalDetails) => {
       version: constants.TRANSACTION_VERSION.V3,
     });
     if (networkName === "sepolia" || networkName === "mainnet") {
-      const receipt = (await provider.waitForTransaction(
-        transaction_hash
-      )) as TransactionReceipt;
-      if (receipt.execution_status !== "SUCCEEDED") {
-        const revertReason = receipt.revert_reason;
-        throw new Error(red(`Deploy Calls Failed: ${revertReason}`));
+          const receipt: GetTransactionReceiptResponse =
+              await provider.waitForTransaction(transaction_hash);
+      
+            // Narrow the union by checking execution_status
+            if (receipt.execution_status !== "SUCCEEDED") {
+              const reverted = receipt as RevertedTransactionReceiptResponse;
+              const revertReason = reverted.revert_reason ?? "Unknown revert reason";
+              throw new Error(red(`Deploy Calls Failed: ${revertReason}`));
+            }
       }
-    }
     console.log(green("Deploy Calls Executed at "), transaction_hash);
   } catch (error) {
     // split the calls in half and try again recursively
